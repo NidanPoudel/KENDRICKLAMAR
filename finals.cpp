@@ -64,6 +64,114 @@ SDL_Window *window = nullptr;
 SDL_Renderer *renderer = nullptr;
 const Uint32 frame_delay = 500;
 
+class Texture
+{
+    SDL_Texture *texture = nullptr;
+
+public:
+    // initialize the texture
+    explicit Texture(const char path[])
+    {
+        texture = IMG_LoadTexture(renderer, path);
+    }
+
+    // cleanup when image exits scope
+    ~Texture()
+    {
+        SDL_DestroyTexture(texture);
+    }
+
+    SDL_Texture *get()
+    {
+        return texture;
+    }
+
+    void render(SDL_Rect *src = nullptr, SDL_Rect *dst = nullptr)
+    {
+        SDL_RenderCopy(renderer, texture, src, dst);
+    }
+};
+class Player
+{
+private:
+    std::string name;
+    int health;
+    int attackPower;
+    SDL_Texture *player;
+    bool hasHitStatus;
+    bool isImpactedStatus;
+
+public:
+    Player(std::string n, int h, int ap) : name(n), health(h), attackPower(ap)
+    {
+        player = nullptr;
+        hasHitStatus = false;
+        isImpactedStatus = false;
+    }
+
+    void setHit()
+    {
+        hasHitStatus = true;
+    }
+    void setImpacted()
+    {
+        isImpactedStatus = true;
+    }
+    void resetHit()
+    {
+        hasHitStatus = false;
+    }
+    void resetImpacted()
+    {
+        isImpactedStatus = false;
+    }
+    bool hasHit() const
+    {
+        return hasHitStatus;
+    }
+    bool isImpacted() const
+    {
+        return isImpactedStatus;
+    }
+
+    virtual ~Player()
+    {
+        SDL_DestroyTexture(player);
+    }
+};
+
+class Kendrick : public Player
+{
+    SDL_Texture *kdot = nullptr;
+
+public:
+    Kendrick() : Player("Kendrick", 100, 20)
+    {
+        kdot = nullptr;
+    }
+
+    ~Kendrick()
+    {
+        SDL_DestroyTexture(kdot);
+    }
+};
+
+class Drake : public Player
+{
+    SDL_Texture *drizzy = nullptr;
+
+public:
+    Drake() : Player("Drake", 120, 15)
+    {
+        drizzy = nullptr;
+    }
+
+    ~Drake()
+    {
+        SDL_DestroyTexture(drizzy);
+    }
+};
+
 // ASSET ADRESSES
 const char drake1[] = "assets/drake/drake1.png";
 const char drake2[] = "assets/drake/drake2.png";
@@ -333,7 +441,7 @@ enum last_button
 };
 int entry = NONE;
 void clear_screen();
-void health_regulator();
+void health_regulator(Kendrick &, Drake &);
 auto collision = []()
 { return SDL_HasIntersection(&kendrick, &drake); };
 SDL_Rect like_us_bar{200, 200, 240, 80};
@@ -347,7 +455,8 @@ void end();
 
 int main(int arg, char *args[])
 {
-
+    Kendrick kendricklamar;
+    Drake drakeau;
     // BASIC INITIALIZATION to handle other image formats like JPG(example) use IMG_INIT_PNG | IMG_INIT_JPG
     SDL_Init(SDL_INIT_EVERYTHING);
     IMG_Init(IMG_INIT_PNG);
@@ -361,7 +470,7 @@ int main(int arg, char *args[])
     SDL_SetWindowIcon(window, icon_surface);
 
     load_assets();
-    // begin();
+    begin();
 
     // EVENT HANDLING
     Uint32 start_time = SDL_GetTicks();
@@ -385,10 +494,12 @@ int main(int arg, char *args[])
                 case SDLK_d:
                     kendrick.x += 20;
                     striked = impact::DRAKE;
+                    drakeau.setImpacted();
                     break;
                 case SDLK_a:
                     kendrick.x -= 20;
                     striked = impact::DRAKE;
+                    drakeau.setImpacted();
                     break;
                 case SDLK_w:
                     if (kendrick_jumps < 2)
@@ -400,6 +511,7 @@ int main(int arg, char *args[])
                     break;
                 case SDLK_s:
                     agressor = hits::KENDRICK;
+                    kendricklamar.setHit();
                     agressor_time = SDL_GetTicks();
                     entry = S;
                     Mix_PlayChannel(-1, voices1, 0);
@@ -409,10 +521,12 @@ int main(int arg, char *args[])
                 case SDLK_RIGHT:
                     drake.x += 20;
                     striked = impact::KENDRICK;
+                    kendricklamar.setImpacted();
                     break;
                 case SDLK_LEFT:
                     drake.x -= 20;
                     striked = impact::KENDRICK;
+                    kendricklamar.setImpacted();
                     break;
                 case SDLK_UP:
                     if (drake_jumps < 2)
@@ -424,6 +538,7 @@ int main(int arg, char *args[])
                     break;
                 case SDLK_DOWN:
                     agressor = hits::DRAKE;
+                    drakeau.setHit();
                     agressor_time = SDL_GetTicks();
                     entry = DOWN;
                     Mix_PlayChannel(-1, hits1, 0);
@@ -476,6 +591,8 @@ int main(int arg, char *args[])
             else
             {
                 agressor = hits::NONE;
+                kendricklamar.resetHit();
+                drakeau.resetHit();
                 SDL_RenderCopy(renderer, kendrick_2, nullptr, &kendrick);
                 SDL_RenderCopy(renderer, drake_2, nullptr, &drake);
             }
@@ -484,7 +601,7 @@ int main(int arg, char *args[])
         checkEnds(&kendrick.x);
         checkEnds(&drake.x);
         // HEALTH BAR
-        health_regulator();
+        health_regulator(kendricklamar, drakeau);
         SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
         SDL_RenderFillRect(renderer, &kendrick_health);
 
@@ -501,7 +618,7 @@ int main(int arg, char *args[])
     return 0;
 }
 
-void health_regulator()
+void health_regulator(Kendrick &k, Drake &d)
 {
     bool collide = collision();
     if (collide)
@@ -510,7 +627,7 @@ void health_regulator()
         {
             if (agressor == hits::KENDRICK)
             {
-                drake_health.w -= 18;
+                drake_health.w -= 5;
                 drake.x += 20;
             }
         }
@@ -519,7 +636,7 @@ void health_regulator()
         {
             if (agressor == hits::DRAKE)
             {
-                kendrick_health.w -= 10;
+                kendrick_health.w -= 5;
                 kendrick.x -= 20;
             }
         }
@@ -528,6 +645,10 @@ void health_regulator()
         kendrick_health.w = 0;
     if (drake_health.w < 0)
         drake_health.w = 0;
+    d.resetHit();
+    d.resetImpacted();
+    k.resetHit();
+    k.resetImpacted();
     striked = impact::NONE;
     // agressor = hits::NONE;
 }
